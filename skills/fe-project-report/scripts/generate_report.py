@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate project_report.html from collected frontend project data."""
+"""Generate frontend project report in HTML, Markdown, or JSON format."""
 
 import json
 import sys
@@ -268,22 +268,162 @@ def build_html(data):
 </html>'''
 
 
+def build_markdown(data):
+    """Generate a Markdown report from collected data."""
+    project_name = data.get("project_name", "未知项目")
+    project_desc = data.get("project_description", "")
+    framework = data.get("framework", "未知")
+    routing_type = data.get("routing_type", "未知")
+    total_pages = data.get("total_pages", len(data.get("pages", [])))
+    total_api = data.get("total_api_calls", 0)
+    total_ms = data.get("total_microservices", len(data.get("microservices", [])))
+
+    pages = data.get("pages", [])
+    microservices = data.get("microservices", [])
+    navigations = data.get("navigations", [])
+
+    lines = []
+
+    # Title
+    lines.append(f"# {project_name} — 项目分析报告")
+    if project_desc:
+        lines.append(f"\n> {project_desc}")
+    lines.append(f"\n- **前端框架**: {framework}")
+    lines.append(f"- **路由类型**: {routing_type}")
+    lines.append(f"- **页面总数**: {total_pages}")
+    lines.append(f"- **接口总数**: {total_api}")
+    lines.append(f"- **微服务数**: {total_ms}")
+    lines.append(f"- **页面跳转关系**: {len(navigations)}")
+
+    # Overview stats
+    lines.append(f"\n## 概览")
+    lines.append(f"\n| 指标 | 数值 |")
+    lines.append(f"|------|------|")
+    lines.append(f"| 页面总数 | {total_pages} |")
+    lines.append(f"| 接口总数 | {total_api} |")
+    lines.append(f"| 微服务数 | {total_ms} |")
+    lines.append(f"| 页面跳转关系 | {len(navigations)} |")
+
+    # Page list table
+    lines.append(f"\n## 页面清单")
+    lines.append(f"\n| 路径 | 页面标题 | 业务域 | 功能描述 | 接口数 |")
+    lines.append(f"|------|---------|--------|---------|--------|")
+    for p in pages:
+        path = p.get("path", "")
+        title = p.get("title", "")
+        domain = p.get("business_domain", "")
+        desc = p.get("description", "")
+        api_n = len(p.get("api_calls", []))
+        desc_short = desc[:60] + "..." if len(desc) > 60 else desc
+        lines.append(f"| `{path}` | {title} | {domain} | {desc_short} | {api_n} |")
+
+    # Page details
+    lines.append(f"\n## 页面详情")
+    for i, p in enumerate(pages):
+        path = p.get("path", "")
+        title = p.get("title", "")
+        domain = p.get("business_domain", "未划分")
+        component = p.get("component", "")
+        desc = p.get("description", "暂无描述")
+        sub_routes = p.get("sub_routes", [])
+        api_calls = p.get("api_calls", [])
+        navigates_to = p.get("navigates_to", [])
+
+        lines.append(f"\n### {i + 1}. {title} (`{path}`)")
+        lines.append(f"\n- **业务域**: {domain}")
+        lines.append(f"- **组件**: `{component}`")
+        if sub_routes:
+            lines.append(f"- **子路由**: {', '.join(f'`{s}`' for s in sub_routes)}")
+        lines.append(f"\n{desc}")
+
+        if api_calls:
+            lines.append(f"\n**接口依赖 ({len(api_calls)})：**")
+            lines.append(f"\n| 方法 | 路径 |")
+            lines.append(f"|------|------|")
+            for api in api_calls:
+                method = api.get("method", "GET")
+                api_path = api.get("path", "")
+                lines.append(f"| {method} | `{api_path}` |")
+
+        if navigates_to:
+            lines.append(f"\n**跳转到：**")
+            for nav in navigates_to:
+                target = nav.get("target", "")
+                label = nav.get("label", "")
+                lines.append(f"- → `{target}`" + (f" · {label}" if label else ""))
+
+    # Microservices section
+    if microservices:
+        lines.append(f"\n## 微服务统计")
+        lines.append(f"\n| 服务名称 | 接口数量 | 端点列表 | 使用页面 |")
+        lines.append(f"|---------|---------|---------|---------|")
+        for ms in microservices:
+            name = ms.get("name", "")
+            count = ms.get("api_count", len(ms.get("endpoints", [])))
+            endpoints = ms.get("endpoints", [])
+            used_by = ms.get("used_by_pages", [])
+            ep_str = ", ".join(f"`{e}`" for e in endpoints[:5])
+            if len(endpoints) > 5:
+                ep_str += f" ... 共 {len(endpoints)} 个"
+            used_str = ", ".join(f"`{p}`" for p in used_by) if used_by else "未知"
+            lines.append(f"| {name} | {count} | {ep_str} | {used_str} |")
+
+    # Navigation flow
+    if navigations:
+        lines.append(f"\n## 页面跳转关系图")
+        lines.append(f"\n| 来源页面 | → | 目标页面 | 触发方式 |")
+        lines.append(f"|---------|---|---------|---------|")
+        for nav in navigations:
+            fr = nav.get("from", "")
+            to = nav.get("to", "")
+            label = nav.get("label", "")
+            lines.append(f"| `{fr}` | → | `{to}` | {label} |")
+
+    lines.append(f"\n---\n*由 FE Project Report 技能自动生成*")
+    return "\n".join(lines)
+
+
+def build_json(data):
+    """Return pretty-printed JSON string of the report data."""
+    return json.dumps(data, ensure_ascii=False, indent=2)
+
+
+FORMAT_HANDLERS = {
+    "html": (".html", build_html),
+    "markdown": (".md", build_markdown),
+    "json": (".json", build_json),
+}
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Generate frontend project report HTML")
-    parser.add_argument("data_file", help="Path to JSON data file")
-    parser.add_argument("-o", "--output", default="project_report.html", help="Output HTML file path")
-    parser.add_argument("--no-open", action="store_true", help="Do not open the report in browser")
+    parser = argparse.ArgumentParser(description="Generate frontend project report in HTML, Markdown, or JSON")
+    parser.add_argument("data_file", help="Path to JSON data file (output from data collection phase)")
+    parser.add_argument("-o", "--output", default=None, help="Output file path (auto-detected from --format if not specified)")
+    parser.add_argument("--format", choices=list(FORMAT_HANDLERS.keys()), default="html",
+                        help="Output format: html (default, with charts), markdown (readable, wiki-friendly), or json (structured data)")
+    parser.add_argument("--no-open", action="store_true", help="Do not open the report in browser (HTML only)")
     args = parser.parse_args()
 
     data = load_data(args.data_file)
-    html = build_html(data)
+    ext, builder = FORMAT_HANDLERS[args.format]
 
-    output_path = Path(args.output).resolve()
-    output_path.write_text(html, encoding="utf-8")
-    print(f"✅ Report generated: {output_path}")
-    print(f"   Pages: {len(data.get('pages', []))} | APIs: {data.get('total_api_calls', 0)} | Microservices: {len(data.get('microservices', []))}")
+    # Determine output path
+    if args.output:
+        output_path = Path(args.output).resolve()
+    else:
+        output_path = Path(f"project_report{ext}").resolve()
 
-    if not args.no_open:
+    content = builder(data)
+    output_path.write_text(content, encoding="utf-8")
+
+    pages = len(data.get("pages", []))
+    apis = data.get("total_api_calls", 0)
+    mss = len(data.get("microservices", []))
+
+    print(f"✅ {args.format.upper()} report generated: {output_path}")
+    print(f"   Format: {args.format} | Pages: {pages} | APIs: {apis} | Microservices: {mss}")
+
+    if args.format == "html" and not args.no_open:
         webbrowser.open(output_path.as_uri())
         print(f"   Opened in browser")
 
