@@ -11,6 +11,7 @@ AI Agent 技能合集
 | [obsidian-memo](skills/obsidian-memo/)           | 在 Obsidian 中管理 AI 协作记忆。自动记录用户偏好和纠正，避免同类问题反复犯错。                                                   |
 | [vertical-codebase](skills/vertical-codebase/)   | 代码架构建议 — 按功能域而非技术层组织代码，走向高内聚、易发现、低耦合的项目结构。                                                |
 | [workplace-writing](skills/workplace-writing/)   | 职场写作教练 — 基于金字塔结构和 SCQA 方法论，帮您编写年终总结、邮件、汇报、方案等各类职场文案。                                  |
+| [zed](skills/zed/)                               | 用 Zed 编辑器打开项目、文件或对比文件差异，支持 Dev Container 和管道输入。                                                       |
 
 ## 安装技能
 
